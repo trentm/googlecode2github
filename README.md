@@ -4,3 +4,7 @@ A small project with some helper scripts for moving a project of yours on
 
 More details to come.
 
+
+# wiki conversion
+
+- <http://code.google.com/p/support/wiki/WikiSyntax>
