@@ -37,7 +37,7 @@ import appdirs
 #---- globals
 
 dirs = appdirs.AppDirs("googlecode2github", "TrentMick")
-DEV = False
+
 
 
 #---- primary functionality
