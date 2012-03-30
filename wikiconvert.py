@@ -52,11 +52,11 @@ def convert_file(proj_id, src_path, dst_dir):
     # Pull out pre-blocks.
     def sub_pre_block(match):
         pre = match.group(1)
-        hash = md5(pre).hexdigest()
+        hash = md5(pre.encode('utf8')).hexdigest()
         s_from_hash[hash] = _indent(pre)
         return hash
     text = re.compile(r'^{{{\n(.*?)^}}}', re.M|re.S).sub(sub_pre_block, text)
-    
+
     # Headings.
     text = re.compile(r'^===(.*?)===\s*$', re.M).sub(lambda m: "### %s\n"%m.group(1).strip(), text)
     text = re.compile(r'^==(.*?)==\s*$', re.M).sub(lambda m: "## %s\n"%m.group(1).strip(), text)
@@ -88,7 +88,7 @@ def convert_file(proj_id, src_path, dst_dir):
             pass
         else:
             s = "[[%s]]" % gh_page_name
-        hash = md5(s).hexdigest()
+        hash = md5(s.encode('utf8')).hexdigest()
         s_from_hash[hash] = s
         return hash
     text = re.compile(r'\[((?:[A-Z][a-z]+)+)(?:\s+(.*?))?\]', re.S).sub(sub_wikilink, text)
@@ -96,7 +96,7 @@ def convert_file(proj_id, src_path, dst_dir):
     # Links
     def sub_link(m):
         s = "[%s](%s)" % (m.group(2), m.group(1))
-        hash = md5(s).hexdigest()
+        hash = md5(s.encode('utf8')).hexdigest()
         s_from_hash[hash] = s
         return hash
     text = re.compile(r'(?<!\[)\[([^\s]+)\s+(.*?)\](?!\])', re.S).sub(sub_link, text)
@@ -135,7 +135,7 @@ def _gh_page_name_from_gc_page_name(gc):
     """Github (gh) Wiki page name from Google Code (gc) Wiki page name."""
     gh = re.sub(r'([A-Z][a-z]+)', r'-\1', gc)[1:]
     return gh
-    
+
 
 #---- mainline
 
