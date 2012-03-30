@@ -229,8 +229,8 @@ def _get_gc_issues(gc_proj):
     """
     http = _get_http()
     max_results = 1000
-    url = ("https://code.google.com/feeds/issues/p/python-markdown2/" 
-        "issues/full?max-results=%d" % max_results)
+    url = ("https://code.google.com/feeds/issues/p/%s/" 
+        "issues/full?max-results=%d" % (gc_proj, max_results))
     response, content = http.request(url)
     if response["status"] not in ("200", "304"):
         raise RuntimeError("error GET'ing %s: %s" % (url, response["status"]))
