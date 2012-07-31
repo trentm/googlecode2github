@@ -124,7 +124,7 @@ Please review that bug for more context and additional comments, but update this
         raise RuntimeError("unexpected response status from Github post "
             "to create issue: %s\n%s\n%s"
             % (response.status, response, content))
-    new_issue = json.loads(content)#["issue"]
+    new_issue = json.loads(content)
     assert new_issue["number"] == gh_new_id, (
         "unexpected id for newly added github issue: expected %d, "
         "got %d\n--\n%s" % (gh_new_id, new_issue["number"], new_issue))
@@ -228,8 +228,7 @@ def _get_gh_issues(gh_proj):
         response, content = http.request(url)
         if response["status"] not in ("200", "304"):
             raise RuntimeError("error GET'ing %s: %s" % (url, response["status"]))
-        #print json.loads(content)
-        issues += json.loads(content)#["issues"]
+        issues += json.loads(content)
     issues.sort(key=operator.itemgetter("number"))
     return issues
 
@@ -282,6 +281,8 @@ def _get_gc_issues(gc_proj):
             issue["published"], "%Y-%m-%dT%H:%M:%S.000Z")
         issue["updated_datetime"] = datetime.datetime.strptime(
             issue["updated"], "%Y-%m-%dT%H:%M:%S.000Z")
+
+        # Only care about open issues.
         if issue['state'] == 'open':
           issues.append(issue)
     #pprint(issues)
