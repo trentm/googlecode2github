@@ -10,6 +10,13 @@ where "GCPROJ" is the Google Code project name, e.g. "python-markdown2"; and
 Limitations:
 - Only supports public issues in a Google Code project. This *could* get into
   google code auth to access protected issues. Patches welcome. :)
+  
+To obtain an OAuth access token:
+curl -u 'USERNAME' -d '{"scopes":["public_repo"],"note":"shadowissues"}' https://api.github.com/authorizations
+curl -H "Authorization: bearer TOKEN" https://api.github.com/users/USERNAME -I
+
+This token will show up in the Authorized applications
+(https://github.com/settings/applications) and can be revoked at any time.
 """
 
 __version__ = "1.0.0"
@@ -59,7 +66,10 @@ def shadow_issues(gc_proj, gh_proj):
     # - Warn (and offer to abort) if there are already issues in the GH project
     #   that are in the way.
     for i, gc_issue in enumerate(gc_issues):
-        shadow_issue(gc_proj, gc_issue, gh_proj, gh_issues)
+        try:
+          shadow_issue(gc_proj, gc_issue, gh_proj, gh_issues)
+        except RuntimeError as e:
+          print e
 
     
 
@@ -83,23 +93,23 @@ def shadow_issue(gc_proj, gc_issue, gh_proj, gh_issues, force=False):
         return
     
     #pprint(gc_issue)
-    title = "[shadow] %s" % gc_issue["title"]
+    title = "%s [moved]" % gc_issue["title"]
     extra = ""
     if gc_issue["state"] == "closed":
         extra += " Closed (%s)." % gc_issue["status"]
     if "labels" in gc_issue:
-        extra += "\nLabels: %s." % ", ".join(gc_issue["labels"])
+        extra += "\n\nOriginal labels: %s" % ", ".join(gc_issue["labels"])
     body = u"""\
-*This is a **shadow issue** for [Issue %s on Google Code](%s) (from which this project was moved).
-Added %s by [%s](http://code.google.com%s).%s
-Please make updates to the bug [there](%s).*
+This is [Issue %s](%s) moved from a Google Code project.
+Added by %s by [%s](http://code.google.com%s).
+Please review that bug for more context and additional comments, but update this bug.
+%s
 
-# Original description
+### Original description
 
 %s
 """ % (gc_issue["id"], gc_issue["url"],
        gc_issue["published"], gc_issue["author"]["name"], gc_issue["author"]["uri"], extra,
-       gc_issue["url"],
        # Indent to put as Markdown pre block (because Google Code issue content
        # just isn't Markdown in general).
        _indent(gc_issue["content"]))
@@ -108,13 +118,13 @@ Please make updates to the bug [there](%s).*
     #print
     #print body
     
-    response, content = _github_api_post("/issues/open/%s" % gh_proj,
+    response, content = _github_api_post(gh_proj,
         {"title": title.encode('utf-8'), "body": body.encode('utf-8')})
     if response.status not in (201,):
         raise RuntimeError("unexpected response status from Github post "
             "to create issue: %s\n%s\n%s"
             % (response.status, response, content))
-    new_issue = json.loads(content)["issue"]
+    new_issue = json.loads(content)#["issue"]
     assert new_issue["number"] == gh_new_id, (
         "unexpected id for newly added github issue: expected %d, "
         "got %d\n--\n%s" % (gh_new_id, new_issue["number"], new_issue))
@@ -181,7 +191,7 @@ def _get_github_auth():
         if not login:
             login = raw_input("Github username: ")
         if not token:
-            token = getpass("Github API token (see <https://github.com/account#admin_bucket>): ")
+            token = getpass("Github OAuth access token (see http://developer.github.com/v3/oauth/#create-a-new-authorization>): ")
         
         if not login or not token:
             raise RuntimeError("couldn't get github auth info")
@@ -197,13 +207,13 @@ def _github_api_post(path, params=None):
     time.sleep(1)
     
     http = _get_http()
-    url = "https://github.com/api/v2/json" + path
+    url = 'https://api.github.com/repos/%s/issues' % (path)
     login, token = _get_github_auth()
     if params is None:
         params = {}
-    params["login"] = login
-    params["token"] = token
-    return http.request(url, "POST", urlencode(params))
+    #params["login"] = login
+    #params["access_token"] = token
+    return http.request(url + '?access_token=' + token, "POST", json.dumps(params))
 
 def _get_gh_issues(gh_proj):
     """Get the issues for the given github project (only support public
@@ -214,11 +224,12 @@ def _get_gh_issues(gh_proj):
     issues = []
     for state in ("open", "closed"):
         http = _get_http()
-        url = "https://github.com/api/v2/json/issues/list/%s/%s" % (gh_proj, state)
+        url = 'https://api.github.com/repos/%s/issues?state=%s' % (gh_proj, state)
         response, content = http.request(url)
         if response["status"] not in ("200", "304"):
             raise RuntimeError("error GET'ing %s: %s" % (url, response["status"]))
-        issues += json.loads(content)["issues"]
+        #print json.loads(content)
+        issues += json.loads(content)#["issues"]
     issues.sort(key=operator.itemgetter("number"))
     return issues
 
@@ -271,7 +282,8 @@ def _get_gc_issues(gc_proj):
             issue["published"], "%Y-%m-%dT%H:%M:%S.000Z")
         issue["updated_datetime"] = datetime.datetime.strptime(
             issue["updated"], "%Y-%m-%dT%H:%M:%S.000Z")
-        issues.append(issue)
+        if issue['state'] == 'open':
+          issues.append(issue)
     #pprint(issues)
     
     if len(issues) == max_results:
