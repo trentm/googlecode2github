@@ -54,6 +54,7 @@ def shadow_issues(gc_proj, gh_proj):
     gc_issues = _get_gc_issues(gc_proj)
     if not gc_issues:
         print "No code.google.com/p/%s issues found. Nothing to do." % gc_proj
+    #pprint(gc_issues)
 
     print "# Gathering any github.com/%s issues." % gh_proj
     gh_issues = _get_gh_issues(gh_proj)
@@ -118,7 +119,7 @@ Please review that bug for more context and additional comments, but update this
     #print
     #print body
 
-    response, content = _github_api_post(gh_proj,
+    response, content = _github_api_post('/repos/%s/issues' % gh_proj,
         {"title": title.encode('utf-8'), "body": body.encode('utf-8')})
     if response.status not in (201,):
         raise RuntimeError("unexpected response status from Github post "
@@ -129,13 +130,14 @@ Please review that bug for more context and additional comments, but update this
         "unexpected id for newly added github issue: expected %d, "
         "got %d\n--\n%s" % (gh_new_id, new_issue["number"], new_issue))
     if gc_issue["state"] == "closed":
-        response, content = _github_api_post(
-            "/issues/close/%s/%s" % (gh_proj, new_issue["number"]))
+        response, content = _github_api_patch(
+            "/repos/%s/issues/%s" % (gh_proj, new_issue["number"]),
+            {"state": "closed"})
         if response.status not in (200,):
             raise RuntimeError("unexpected response status from Github post "
                 "to close issue: %s\n%s\n%s"
                 % (response.status, response, content))
-        new_issue = json.loads(content)["issue"]
+        new_issue = json.loads(content)
     gh_issues.append(new_issue)
     return new_issue
 
@@ -207,13 +209,25 @@ def _github_api_post(path, params=None):
     time.sleep(1)
 
     http = _get_http()
-    url = 'https://api.github.com/repos/%s/issues' % (path)
+    url = 'https://api.github.com' + path
     login, token = _get_github_auth()
     if params is None:
         params = {}
-    #params["login"] = login
-    #params["access_token"] = token
     return http.request(url + '?access_token=' + token, "POST", json.dumps(params))
+
+def _github_api_patch(path, params=None):
+    from urllib import urlencode
+    import time
+
+    # Hack wait to avoid hitting Github's 60 req/minute rate limiting.
+    time.sleep(1)
+
+    http = _get_http()
+    url = 'https://api.github.com' + path
+    login, token = _get_github_auth()
+    if params is None:
+        params = {}
+    return http.request(url + '?access_token=' + token, "PATCH", json.dumps(params))
 
 def _get_gh_issues(gh_proj):
     """Get the issues for the given github project (only support public
@@ -283,8 +297,7 @@ def _get_gc_issues(gc_proj):
             issue["updated"], "%Y-%m-%dT%H:%M:%S.000Z")
 
         # Only care about open issues.
-        if issue['state'] == 'open':
-          issues.append(issue)
+        issues.append(issue)
     #pprint(issues)
 
     if len(issues) == max_results:
