@@ -10,7 +10,7 @@ where "GCPROJ" is the Google Code project name, e.g. "python-markdown2"; and
 Limitations:
 - Only supports public issues in a Google Code project. This *could* get into
   google code auth to access protected issues. Patches welcome. :)
-  
+
 To obtain an OAuth access token:
 curl -u 'USERNAME' -d '{"scopes":["public_repo"],"note":"shadowissues"}' https://api.github.com/authorizations
 curl -H "Authorization: bearer TOKEN" https://api.github.com/users/USERNAME -I
@@ -54,14 +54,14 @@ def shadow_issues(gc_proj, gh_proj):
     gc_issues = _get_gc_issues(gc_proj)
     if not gc_issues:
         print "No code.google.com/p/%s issues found. Nothing to do." % gc_proj
-    
+
     print "# Gathering any github.com/%s issues." % gh_proj
     gh_issues = _get_gh_issues(gh_proj)
-        
+
     # For testing, migrate just a particular issue.
     #shadow_issue(gc_proj, gc_issues[6], gh_proj, gh_issues, force=True)
     #return
-    
+
     # Create a GH shadow issue for each GC issue that we haven't done already.
     # - Warn (and offer to abort) if there are already issues in the GH project
     #   that are in the way.
@@ -71,12 +71,12 @@ def shadow_issues(gc_proj, gh_proj):
         except RuntimeError as e:
           print e
 
-    
+
 
 def shadow_issue(gc_proj, gc_issue, gh_proj, gh_issues, force=False):
     """
     Side-effect: this extends `gh_issues` if an issue is successfully added.
-    
+
     @param force {bool} If true, this will create a shadow issue even if the
         Google Code and Github issue numbers don't match.
     """
@@ -91,7 +91,7 @@ def shadow_issue(gc_proj, gc_issue, gh_proj, gh_issues, force=False):
     if not force and id != gh_new_id:
         print "  WARNING: github issue id would not match, skipping"
         return
-    
+
     #pprint(gc_issue)
     title = "%s [moved]" % gc_issue["title"]
     extra = ""
@@ -117,7 +117,7 @@ Please review that bug for more context and additional comments, but update this
     #print title
     #print
     #print body
-    
+
     response, content = _github_api_post(gh_proj,
         {"title": title.encode('utf-8'), "body": body.encode('utf-8')})
     if response.status not in (201,):
@@ -139,7 +139,7 @@ Please review that bug for more context and additional comments, but update this
     gh_issues.append(new_issue)
     return new_issue
 
-    
+
 
 
 #---- internal support stuff
@@ -153,7 +153,7 @@ def _get_http():
 def _load_gitconfig(path):
     from ConfigParser import ConfigParser
     import tempfile
-    
+
     # Hack so ConfigParser can read a .gitconfig file (looser definition).
     fd_path_hack, path_hack = tempfile.mkstemp()
     content = open(path).read()
@@ -161,7 +161,7 @@ def _load_gitconfig(path):
     f = os.fdopen(fd_path_hack, 'w')
     f.write(content)
     f.close()
-    
+
     config = ConfigParser()
     config.read([path_hack])
     os.remove(path_hack)
@@ -172,11 +172,11 @@ def _get_github_auth():
     from os.path import expanduser, exists
     from getpass import getpass
     global _github_auth_cache
-    
+
     if _github_auth_cache is None:
         login = None
         token = None
-    
+
         # If have them in .gitconfig (as per ngist), use that:
         #   git config --add github.user [github_username]
         #   git config --add github.token [github_api_token]
@@ -187,25 +187,25 @@ def _get_github_auth():
                 login = config.get("github", "user")
             if config.has_option("github", "token"):
                 token = config.get("github", "token")
-        
+
         if not login:
             login = raw_input("Github username: ")
         if not token:
             token = getpass("Github OAuth access token (see http://developer.github.com/v3/oauth/#create-a-new-authorization>): ")
-        
+
         if not login or not token:
             raise RuntimeError("couldn't get github auth info")
         _github_auth_cache = (login, token)
-    
+
     return _github_auth_cache
 
 def _github_api_post(path, params=None):
     from urllib import urlencode
     import time
-    
+
     # Hack wait to avoid hitting Github's 60 req/minute rate limiting.
     time.sleep(1)
-    
+
     http = _get_http()
     url = 'https://api.github.com/repos/%s/issues' % (path)
     login, token = _get_github_auth()
@@ -234,21 +234,21 @@ def _get_gh_issues(gh_proj):
 
 def _get_gc_issues(gc_proj):
     """Get the Google Code issues XML for the given project.
-    
+
     <http://code.google.com/p/support/wiki/IssueTrackerAPI>
     """
     http = _get_http()
     max_results = 1000
-    url = ("https://code.google.com/feeds/issues/p/%s/" 
+    url = ("https://code.google.com/feeds/issues/p/%s/"
         "issues/full?max-results=%d" % (gc_proj, max_results))
     response, content = http.request(url)
     if response["status"] not in ("200", "304"):
         raise RuntimeError("error GET'ing %s: %s" % (url, response["status"]))
-    
+
     feed = ET.fromstring(content)
     ns = '{http://www.w3.org/2005/Atom}'
     ns_issues = '{http://schemas.google.com/projecthosting/issues/2009}'
-    
+
     issues = []
     for entry in feed.findall(ns+"entry"):
         alt_link = [link for link in entry.findall(ns+"link") if link.get("rel") == "alternate"][0]
@@ -286,13 +286,13 @@ def _get_gc_issues(gc_proj):
         if issue['state'] == 'open':
           issues.append(issue)
     #pprint(issues)
-    
+
     if len(issues) == max_results:
         raise RuntimeError("This project might have more than %d issues and "
             "this script isn't equipped to deal with that. Aborting."
             % max_results)
     return issues
-    
+
 
 def log(s):
     sys.stderr.write(s+"\n")
@@ -304,7 +304,7 @@ def _gh_page_name_from_gc_page_name(gc):
     """Github (gh) Wiki page name from Google Code (gc) Wiki page name."""
     gh = re.sub(r'([A-Z][a-z]+)', r'-\1', gc)[1:]
     return gh
-    
+
 
 #---- mainline
 
