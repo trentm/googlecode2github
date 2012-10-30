@@ -60,7 +60,7 @@ def shadow_issues(gc_proj, gh_proj):
     gh_issues = _get_gh_issues(gh_proj)
 
     # For testing, migrate just a particular issue.
-    #shadow_issue(gc_proj, gc_issues[6], gh_proj, gh_issues, force=True)
+    #shadow_issue(gc_proj, gc_issues[4], gh_proj, gh_issues, force=True)
     #return
 
     # Create a GH shadow issue for each GC issue that we haven't done already.
@@ -81,6 +81,8 @@ def shadow_issue(gc_proj, gc_issue, gh_proj, gh_issues, force=False):
     @param force {bool} If true, this will create a shadow issue even if the
         Google Code and Github issue numbers don't match.
     """
+    DEBUG = True
+
     id = int(gc_issue["id"])
     gh_issue = [i for i in gh_issues if i["number"] == id] if gh_issues else None
     gh_new_id = ((gh_issues[-1]["number"] + 1) if gh_issues else 1)
@@ -93,7 +95,9 @@ def shadow_issue(gc_proj, gc_issue, gh_proj, gh_issues, force=False):
         print "  WARNING: github issue id would not match, skipping"
         return
 
-    #pprint(gc_issue)
+    if DEBUG:
+        print "-- Google code issue"
+        pprint(gc_issue)
     title = "%s [moved]" % gc_issue["title"]
     extra = ""
     if gc_issue["state"] == "closed":
@@ -114,17 +118,25 @@ Please review that bug for more context and additional comments, but update this
        # Indent to put as Markdown pre block (because Google Code issue content
        # just isn't Markdown in general).
        _indent(gc_issue["content"]))
-    #print "--"
-    #print title
-    #print
-    #print body
+    req = {
+        'url': '/repos/%s/issues' % gh_proj,
+        'body': {
+            "title": title.encode('utf-8'),
+            "body": body.encode('utf-8'),
+        }
+    }
+    if DEBUG:
+        print "-- GH issue data"
+        print "title:", req["title"]
+        print
+        print req["body"]["body"]
 
-    response, content = _github_api_post('/repos/%s/issues' % gh_proj,
-        {"title": title.encode('utf-8'), "body": body.encode('utf-8')})
+    response, content = _github_api_post(req['url'], req['body'])
     if response.status not in (201,):
         raise RuntimeError("unexpected response status from Github post "
-            "to create issue: %s\n%s\n%s"
-            % (response.status, response, content))
+            "to create issue:\n-- req:\n%r\n-- res:\n%r"
+            % (req,
+               {"status": response.status, "headers": response, "body": content}))
     new_issue = json.loads(content)
     assert new_issue["number"] == gh_new_id, (
         "unexpected id for newly added github issue: expected %d, "
@@ -213,7 +225,9 @@ def _github_api_post(path, params=None):
     login, token = _get_github_auth()
     if params is None:
         params = {}
-    return http.request(url + '?access_token=' + token, "POST", json.dumps(params))
+    return http.request(url + '?access_token=' + token, "POST",
+        json.dumps(params),
+        headers={'content-type': 'application/json'})
 
 def _github_api_patch(path, params=None):
     from urllib import urlencode
