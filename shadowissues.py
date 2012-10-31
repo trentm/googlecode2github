@@ -81,7 +81,7 @@ def shadow_issue(gc_proj, gc_issue, gh_proj, gh_issues, force=False):
     @param force {bool} If true, this will create a shadow issue even if the
         Google Code and Github issue numbers don't match.
     """
-    DEBUG = True
+    DEBUG = False
 
     id = int(gc_issue["id"])
     gh_issue = [i for i in gh_issues if i["number"] == id] if gh_issues else None
