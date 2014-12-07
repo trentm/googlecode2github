@@ -39,8 +39,10 @@ def convert_file(proj_id, src_path, dst_dir):
         if line.startswith("#"):
             meta_lines.append(line)
         else:
-            assert not line.strip(), "line isn't empty: %r" % line
-            body_lines = lines[i+1:]
+            if not line.strip():
+                body_lines = lines[i+1:]
+            else:
+                body_lines = lines[i:]
             break
     meta = {}
     for line in meta_lines:
@@ -49,13 +51,12 @@ def convert_file(proj_id, src_path, dst_dir):
     text = '\n'.join(body_lines)
     s_from_hash = {}
 
-    # Pull out pre-blocks.
-    def sub_pre_block(match):
-        pre = match.group(1)
-        hash = md5(pre.encode('utf8')).hexdigest()
-        s_from_hash[hash] = _indent(pre)
-        return hash
-    text = re.compile(r'^{{{\n(.*?)^}}}', re.M|re.S).sub(sub_pre_block, text)
+    text = re.sub(r'^<wiki:toc.*\n', r'<!-- No auto-Table of Contents support! -->\n',
+                  text)
+
+    # Code blocks
+    text = re.compile(r'^{{{+ *\n', re.M).sub(r"```\n", text)
+    text = re.compile(r'^}}}+ *(\n|$)', re.M).sub(r"```\n", text)
 
     # Headings.
     text = re.compile(r'^===(.*?)===\s*$', re.M).sub(lambda m: "### %s\n"%m.group(1).strip(), text)
@@ -76,9 +77,9 @@ def convert_file(proj_id, src_path, dst_dir):
         return '\n\n' + '\n'.join(lines)
     text = re.compile(r'\n(\n^\|\|(.*?\|\|)+$)+', re.M).sub(sub_table, text)
 
-    # Lists (don't handle nested lists).
-    text = re.compile(r'^[ \t]+\*[ \t]+(.*?)[ \t]*$', re.M).sub(r'- \1', text)
-    text = re.compile(r'^[ \t]+#[ \t]+(.*?)[ \t]*$', re.M).sub(r'1. \1', text)
+    # Lists.  Try to handle nested lists by keeping leading whitespace.
+    text = re.compile(r'^([ \t]+)\*[ \t]+(.*?)[ \t]*$', re.M).sub(r'\1- \2', text)
+    text = re.compile(r'^([ \t]+)#[ \t]+(.*?)[ \t]*$', re.M).sub(r'\g<1>1. \2', text)
 
     # wiki links.
     def sub_wikilink(m):
